@@ -52,7 +52,7 @@ function EvaluationResults({ result }) {
 }
 
 export default function Home() {
-  // Các danh sách mẫu cho Practice 1 và Practice 2
+  // Danh sách câu mẫu cho Practice 1
   const practice1List = [
     "We should finish the project for our history class.",
     "Peter is revising for his exam next week.",
@@ -61,15 +61,14 @@ export default function Home() {
     "I have installed some apps on my phone.",
   ];
 
+  // Danh sách câu mẫu cho Practice 2 (đã thêm 2 dòng mới)
   const practice2List = [
     "Our teacher often gives us videos to watch at home.",
     "I never read books on my tablet at night.",
     "It is a new way of learning and students really like it.",
+    "You can find a lot of useful tips on this website.",
+    "They should make an outline for their presentation.",
   ];
-
-  // Đoạn văn cho đánh giá trọng âm
-  const stressText =
-    "You can find a lot of useful tips on this website.\n\nThey should make an outline for their presentation.";
 
   const [selectedPractice, setSelectedPractice] = useState("practice1");
   const [text, setText] = useState('');
@@ -82,15 +81,14 @@ export default function Home() {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
-  // Xử lý chọn nội dung từ danh sách mẫu
+  // Xử lý chọn câu mẫu để điền vào ô nhập nội dung
   const handleSelectSentence = (sentence) => {
     setText(sentence);
   };
 
-  // Xử lý chuyển đổi giữa các Practice
+  // Chuyển đổi giữa Practice 1 và Practice 2
   const handlePracticeSwitch = (practice) => {
     setSelectedPractice(practice);
-    // Xóa nội dung hiện tại khi chuyển đổi (người dùng sẽ chọn lại)
     setText('');
   };
 
@@ -169,22 +167,15 @@ export default function Home() {
     <div style={{ padding: '2rem' }}>
       <h1>Speechace Pronunciation Evaluator</h1>
       
-      {/* Phần chọn nội dung */}
+      {/* Phần chuyển đổi nội dung Practice */}
       <div style={{ marginBottom: '1rem' }}>
         <button onClick={() => handlePracticeSwitch("practice1")}>Practice 1</button>
         <button onClick={() => handlePracticeSwitch("practice2")}>Practice 2</button>
-        <button onClick={() => setText(stressText)}>Stress Evaluation</button>
       </div>
 
       {/* Hiển thị nội dung mẫu theo Practice được chọn */}
       {selectedPractice === "practice1" && (
-        <div
-          style={{
-            border: '1px solid #ccc',
-            padding: '1rem',
-            marginBottom: '1rem',
-          }}
-        >
+        <div style={{ border: '1px solid #ccc', padding: '1rem', marginBottom: '1rem' }}>
           {practice1List.map((sentence, idx) => (
             <div
               key={idx}
@@ -202,13 +193,7 @@ export default function Home() {
         </div>
       )}
       {selectedPractice === "practice2" && (
-        <div
-          style={{
-            border: '1px solid #ccc',
-            padding: '1rem',
-            marginBottom: '1rem',
-          }}
-        >
+        <div style={{ border: '1px solid #ccc', padding: '1rem', marginBottom: '1rem' }}>
           {practice2List.map((sentence, idx) => (
             <div
               key={idx}
@@ -226,14 +211,14 @@ export default function Home() {
         </div>
       )}
 
-      {/* Ô nhập nội dung – người dùng có thể chỉnh sửa nội dung sau khi chọn */}
+      {/* Ô nhập nội dung – người dùng có thể chỉnh sửa sau khi chọn câu mẫu */}
       <div style={{ marginBottom: '1rem' }}>
         <label>Nhập nội dung bạn đọc:</label>
         <br />
         <textarea
           value={text}
           onChange={handleTextChange}
-          placeholder="Chọn nội dung từ Practice hoặc Stress Evaluation"
+          placeholder="Chọn nội dung từ Practice"
           required
           rows={4}
           style={{ width: '100%', padding: '0.5rem' }}
@@ -269,7 +254,7 @@ export default function Home() {
         </button>
       </form>
 
-      {/* Hiển thị kết quả đánh giá */}
+      {/* Hiển thị kết quả */}
       {result && result.status === "success" && <EvaluationResults result={result} />}
       {result && result.error && (
         <div style={{ marginTop: '2rem', color: 'red' }}>
