@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     }
 
     const { text } = fields;
-    const audioFile = files.user_audio_file || files.audio; // Duy trì kiểm tra nếu cần
+    const audioFile = files.user_audio_file || files.audio; // Ưu tiên user_audio_file
 
     if (!audioFile) {
       res.status(400).json({ error: 'File audio là bắt buộc' });
