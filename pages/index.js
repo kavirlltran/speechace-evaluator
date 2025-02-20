@@ -12,19 +12,33 @@ function EvaluationResults({ result }) {
       </p>
       {text_score.word_score_list &&
         text_score.word_score_list.map((word, idx) => (
-          <div key={idx} style={{ marginBottom: '1rem', padding: '0.5rem', border: '1px solid #ddd' }}>
+          <div
+            key={idx}
+            style={{
+              marginBottom: '1rem',
+              padding: '0.5rem',
+              border: '1px solid #ddd',
+            }}
+          >
             <p>
-              <strong>Từ:</strong> {word.word} - <strong>Điểm chất lượng:</strong> {word.quality_score}
+              <strong>Từ:</strong> {word.word} -{' '}
+              <strong>Điểm chất lượng:</strong> {word.quality_score}
             </p>
             {word.phone_score_list && (
               <div style={{ marginLeft: '1rem' }}>
-                <p><em>Chi tiết âm tiết:</em></p>
+                <p>
+                  <em>Chi tiết phát âm:</em>
+                </p>
                 <ul>
                   {word.phone_score_list.map((phone, i) => (
                     <li key={i}>
-                      <strong>Phone:</strong> {phone.phone}{" "}
-                      {phone.quality_score !== undefined && (
-                        <> - <strong>Điểm:</strong> {phone.quality_score}</>
+                      <strong>Phone:</strong> {phone.phone} -{' '}
+                      <strong>Quality:</strong> {phone.quality_score}
+                      {phone.stress_level !== null && (
+                        <> - <strong>Stress Level:</strong> {phone.stress_level}</>
+                      )}
+                      {phone.stress_score !== undefined && (
+                        <> - <strong>Stress Score:</strong> {phone.stress_score}</>
                       )}
                     </li>
                   ))}
@@ -38,6 +52,26 @@ function EvaluationResults({ result }) {
 }
 
 export default function Home() {
+  // Các danh sách mẫu cho Practice 1 và Practice 2
+  const practice1List = [
+    "We should finish the project for our history class.",
+    "Peter is revising for his exam next week.",
+    "Students will spend more time working with other classmates.",
+    "I like to watch videos that help me learn new things.",
+    "I have installed some apps on my phone.",
+  ];
+
+  const practice2List = [
+    "Our teacher often gives us videos to watch at home.",
+    "I never read books on my tablet at night.",
+    "It is a new way of learning and students really like it.",
+  ];
+
+  // Đoạn văn cho đánh giá trọng âm
+  const stressText =
+    "You can find a lot of useful tips on this website.\n\nThey should make an outline for their presentation.";
+
+  const [selectedPractice, setSelectedPractice] = useState("practice1");
   const [text, setText] = useState('');
   const [result, setResult] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -47,6 +81,18 @@ export default function Home() {
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
+
+  // Xử lý chọn nội dung từ danh sách mẫu
+  const handleSelectSentence = (sentence) => {
+    setText(sentence);
+  };
+
+  // Xử lý chuyển đổi giữa các Practice
+  const handlePracticeSwitch = (practice) => {
+    setSelectedPractice(practice);
+    // Xóa nội dung hiện tại khi chuyển đổi (người dùng sẽ chọn lại)
+    setText('');
+  };
 
   const handleTextChange = (e) => {
     setText(e.target.value);
@@ -93,7 +139,7 @@ export default function Home() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!text || !audioBlob) {
-      alert('Vui lòng nhập nội dung và ghi âm để đánh giá.');
+      alert('Vui lòng chọn nội dung và ghi âm để đánh giá.');
       return;
     }
     setLoading(true);
@@ -122,43 +168,108 @@ export default function Home() {
   return (
     <div style={{ padding: '2rem' }}>
       <h1>Speechace Pronunciation Evaluator</h1>
-      <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: '1rem' }}>
-          <label>Nhập văn bản bạn đọc:</label>
-          <br />
-          <input
-            type="text"
-            value={text}
-            onChange={handleTextChange}
-            placeholder="Nhập văn bản tham chiếu"
-            required
-            style={{ width: '100%', padding: '0.5rem' }}
-          />
-        </div>
-        <div style={{ marginBottom: '1rem' }}>
-          <label>Ghi âm trực tiếp:</label>
-          <br />
-          {!isRecording && (
-            <button type="button" onClick={startRecording}>
-              Bắt đầu ghi âm
-            </button>
-          )}
-          {isRecording && (
-            <button type="button" onClick={stopRecording}>
-              Dừng ghi âm
-            </button>
-          )}
-          {audioUrl && (
-            <div style={{ marginTop: '1rem' }}>
-              <p>Xem trước âm thanh:</p>
-              <audio controls src={audioUrl}></audio>
+      
+      {/* Phần chọn nội dung */}
+      <div style={{ marginBottom: '1rem' }}>
+        <button onClick={() => handlePracticeSwitch("practice1")}>Practice 1</button>
+        <button onClick={() => handlePracticeSwitch("practice2")}>Practice 2</button>
+        <button onClick={() => setText(stressText)}>Stress Evaluation</button>
+      </div>
+
+      {/* Hiển thị nội dung mẫu theo Practice được chọn */}
+      {selectedPractice === "practice1" && (
+        <div
+          style={{
+            border: '1px solid #ccc',
+            padding: '1rem',
+            marginBottom: '1rem',
+          }}
+        >
+          {practice1List.map((sentence, idx) => (
+            <div
+              key={idx}
+              onClick={() => handleSelectSentence(sentence)}
+              style={{
+                cursor: 'pointer',
+                marginBottom: '0.5rem',
+                backgroundColor: text === sentence ? '#eef' : 'transparent',
+                padding: '0.3rem',
+              }}
+            >
+              {sentence}
             </div>
-          )}
+          ))}
         </div>
+      )}
+      {selectedPractice === "practice2" && (
+        <div
+          style={{
+            border: '1px solid #ccc',
+            padding: '1rem',
+            marginBottom: '1rem',
+          }}
+        >
+          {practice2List.map((sentence, idx) => (
+            <div
+              key={idx}
+              onClick={() => handleSelectSentence(sentence)}
+              style={{
+                cursor: 'pointer',
+                marginBottom: '0.5rem',
+                backgroundColor: text === sentence ? '#eef' : 'transparent',
+                padding: '0.3rem',
+              }}
+            >
+              {sentence}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Ô nhập nội dung – người dùng có thể chỉnh sửa nội dung sau khi chọn */}
+      <div style={{ marginBottom: '1rem' }}>
+        <label>Nhập nội dung bạn đọc:</label>
+        <br />
+        <textarea
+          value={text}
+          onChange={handleTextChange}
+          placeholder="Chọn nội dung từ Practice hoặc Stress Evaluation"
+          required
+          rows={4}
+          style={{ width: '100%', padding: '0.5rem' }}
+        />
+      </div>
+
+      {/* Phần ghi âm */}
+      <div style={{ marginBottom: '1rem' }}>
+        <label>Ghi âm trực tiếp:</label>
+        <br />
+        {!isRecording && (
+          <button type="button" onClick={startRecording}>
+            Bắt đầu ghi âm
+          </button>
+        )}
+        {isRecording && (
+          <button type="button" onClick={stopRecording}>
+            Dừng ghi âm
+          </button>
+        )}
+        {audioUrl && (
+          <div style={{ marginTop: '1rem' }}>
+            <p>Xem trước âm thanh:</p>
+            <audio controls src={audioUrl}></audio>
+          </div>
+        )}
+      </div>
+
+      {/* Gửi dữ liệu đánh giá */}
+      <form onSubmit={handleSubmit}>
         <button type="submit" disabled={loading}>
           {loading ? 'Đang đánh giá...' : 'Đánh giá phát âm'}
         </button>
       </form>
+
+      {/* Hiển thị kết quả đánh giá */}
       {result && result.status === "success" && <EvaluationResults result={result} />}
       {result && result.error && (
         <div style={{ marginTop: '2rem', color: 'red' }}>
