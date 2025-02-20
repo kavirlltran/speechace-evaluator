@@ -1,0 +1,19 @@
+{
+    "name": "speechace-evaluator",
+    "version": "1.0.0",
+    "private": true,
+    "scripts": {
+      "dev": "next dev",
+      "build": "next build",
+      "start": "next start"
+    },
+    "dependencies": {
+      "next": "latest",
+      "react": "latest",
+      "react-dom": "latest",
+      "formidable": "^2.0.1",
+      "form-data": "^4.0.0",
+      "node-fetch": "^2.6.1"
+    }
+  }
+  
