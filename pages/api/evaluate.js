@@ -4,7 +4,7 @@ import fs from 'fs';
 import FormData from 'form-data';
 import fetch from 'node-fetch';
 
-// Tắt body parser của Next.js vì chúng ta sẽ sử dụng formidable
+// Tắt body parser của Next.js vì chúng ta sử dụng formidable để parse multipart form
 export const config = {
   api: {
     bodyParser: false,
@@ -17,7 +17,6 @@ export default async function handler(req, res) {
     return;
   }
 
-  // Parse dữ liệu multipart bằng formidable
   const form = new formidable.IncomingForm();
   form.parse(req, async (err, fields, files) => {
     if (err) {
@@ -27,17 +26,18 @@ export default async function handler(req, res) {
     }
 
     const { text } = fields;
-    const audioFile = files.audio;
+    const audioFile = files.user_audio_file || files.audio; // Duy trì kiểm tra nếu cần
 
     if (!audioFile) {
       res.status(400).json({ error: 'File audio là bắt buộc' });
       return;
     }
 
-    // Tạo FormData mới để gửi tới Speechace API
+    // Tạo FormData để gửi tới Speechace API
     const formData = new FormData();
     formData.append('text', text);
-    formData.append('audio', fs.createReadStream(audioFile.filepath), {
+    // Sử dụng tên trường "user_audio_file" như yêu cầu của Speechace API
+    formData.append('user_audio_file', fs.createReadStream(audioFile.filepath), {
       filename: audioFile.originalFilename,
       contentType: audioFile.mimetype,
     });
@@ -50,7 +50,7 @@ export default async function handler(req, res) {
       const response = await fetch(speechaceUrl, {
         method: 'POST',
         body: formData,
-        headers: formData.getHeaders(), // Cần set header multipart
+        headers: formData.getHeaders(),
       });
 
       const data = await response.json();

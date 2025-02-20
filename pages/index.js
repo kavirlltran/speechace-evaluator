@@ -62,12 +62,12 @@ export default function Home() {
     }
     setLoading(true);
 
-    // Chuyển đổi Blob thành File để gửi đi
+    // Chuyển Blob thành File để gửi đi
     const audioFile = new File([audioBlob], 'recording.webm', { type: 'audio/webm' });
 
     const formData = new FormData();
     formData.append('text', text);
-    formData.append('audio', audioFile);
+    formData.append('user_audio_file', audioFile); // Đổi tên trường thành "user_audio_file"
 
     try {
       const res = await fetch('/api/evaluate', {
