@@ -1,47 +1,38 @@
-// pages/index.js
 import { useState, useRef } from 'react';
 
-function EvaluationResults({ result }) {
-  const { text_score } = result;
-  if (!text_score) return null;
-  return (
-    <div className="results">
-      <h2>Kết quả đánh giá</h2>
-      <p>
-        <strong>Văn bản:</strong> {text_score.text}
-      </p>
-      {text_score.word_score_list &&
-        text_score.word_score_list.map((word, idx) => (
-          <div key={idx} className="word-box">
-            <p>
-              <strong>Từ:</strong> {word.word} -{' '}
-              <strong>Điểm chất lượng:</strong> {word.quality_score}
-            </p>
-            {word.phone_score_list && (
-              <div className="phone-details">
-                <p>
-                  <em>Chi tiết phát âm:</em>
-                </p>
-                <ul>
-                  {word.phone_score_list.map((phone, i) => (
-                    <li key={i}>
-                      <strong>Phone:</strong> {phone.phone} -{' '}
-                      <strong>Quality:</strong> {phone.quality_score}
-                      {phone.stress_level !== null && (
-                        <> - <strong>Stress Level:</strong> {phone.stress_level}</>
-                      )}
-                      {phone.stress_score !== undefined && (
-                        <> - <strong>Stress Score:</strong> {phone.stress_score}</>
-                      )}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            )}
-          </div>
-        ))}
-    </div>
-  );
+// Hàm tính điểm tổng hợp và trả về thông điệp đánh giá
+function getSummary(result) {
+  if (!result || !result.text_score || !result.text_score.word_score_list) return '';
+  const words = result.text_score.word_score_list;
+  let totalQuality = 0;
+  let totalStress = 0;
+  let countStress = 0;
+  
+  words.forEach((word) => {
+    totalQuality += word.quality_score;
+    if (word.phone_score_list) {
+      word.phone_score_list.forEach((phone) => {
+        if (typeof phone.stress_score !== 'undefined') {
+          totalStress += phone.stress_score;
+          countStress++;
+        }
+      });
+    }
+  });
+  
+  const avgQuality = totalQuality / words.length;
+  const avgStress = countStress ? totalStress / countStress : 0;
+  
+  const qualityMessage =
+    avgQuality >= 80
+      ? 'Phát âm của bạn rất chính xác.'
+      : 'Phát âm của bạn cần cải thiện.';
+  const stressMessage =
+    avgStress >= 90
+      ? 'Trọng âm của bạn được nhấn đúng.'
+      : 'Trọng âm của bạn cần cải thiện.';
+  
+  return `Đánh giá: ${qualityMessage} ${stressMessage}`;
 }
 
 export default function Home() {
@@ -74,7 +65,7 @@ export default function Home() {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
-  // Xử lý chọn câu mẫu để điền vào textbox
+  // Chọn câu mẫu
   const handleSelectSentence = (sentence) => {
     setText(sentence);
   };
@@ -98,20 +89,17 @@ export default function Home() {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
       mediaRecorderRef.current = new MediaRecorder(stream);
       audioChunksRef.current = [];
-
       mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
-
       mediaRecorderRef.current.onstop = () => {
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         setAudioBlob(blob);
         const url = URL.createObjectURL(blob);
         setAudioUrl(url);
       };
-
       mediaRecorderRef.current.start();
       setIsRecording(true);
     } catch (error) {
@@ -134,12 +122,10 @@ export default function Home() {
       return;
     }
     setLoading(true);
-
     const audioFile = new File([audioBlob], 'recording.webm', { type: 'audio/webm' });
     const formData = new FormData();
     formData.append('text', text);
     formData.append('user_audio_file', audioFile);
-
     try {
       const res = await fetch('/api/evaluate', {
         method: 'POST',
@@ -159,10 +145,16 @@ export default function Home() {
       <h1>Speechace Pronunciation Evaluator</h1>
 
       <div className="practice-switch">
-        <button onClick={() => handlePracticeSwitch("practice1")} className={selectedPractice === "practice1" ? "active" : ""}>
+        <button
+          onClick={() => handlePracticeSwitch("practice1")}
+          className={selectedPractice === "practice1" ? "active" : ""}
+        >
           Practice 1
         </button>
-        <button onClick={() => handlePracticeSwitch("practice2")} className={selectedPractice === "practice2" ? "active" : ""}>
+        <button
+          onClick={() => handlePracticeSwitch("practice2")}
+          className={selectedPractice === "practice2" ? "active" : ""}
+        >
           Practice 2
         </button>
       </div>
@@ -231,7 +223,12 @@ export default function Home() {
         </button>
       </form>
 
-      {result && result.status === "success" && <EvaluationResults result={result} />}
+      {result && result.status === "success" && (
+        <div className="evaluation-summary">
+          <h2>Kết quả đánh giá</h2>
+          <p>{getSummary(result)}</p>
+        </div>
+      )}
       {result && result.error && (
         <div className="error-message">
           <h2>Lỗi:</h2>
@@ -342,19 +339,13 @@ export default function Home() {
           color: red;
           margin-top: 1.5rem;
         }
-        .results {
+        .evaluation-summary {
           text-align: left;
           margin-top: 2rem;
-        }
-        .word-box {
+          padding: 1rem;
           border: 1px solid #ddd;
-          padding: 0.5rem;
           border-radius: 4px;
-          margin-bottom: 1rem;
-        }
-        .phone-details ul {
-          list-style: none;
-          padding-left: 1rem;
+          background: #f9f9f9;
         }
       `}</style>
     </div>

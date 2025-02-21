@@ -1,4 +1,3 @@
-// pages/api/evaluate.js
 import formidable from 'formidable';
 import fs from 'fs';
 import FormData from 'form-data';
