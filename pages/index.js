@@ -41,7 +41,6 @@ function getDetailedSummaryComponents(result, originalSentence) {
     const wordClean = wordObj.word.toLowerCase();
     // Nhóm normal: từ không có dấu nhấn trong bản gốc
     if (normalWords.includes(wordClean)) {
-      // Ngưỡng đánh giá cho normal (có thể điều chỉnh)
       if (wordObj.quality_score < 40) {
         normalIssues.incorrect.push(wordObj.word);
       } else if (wordObj.quality_score < 70) {
@@ -60,7 +59,6 @@ function getDetailedSummaryComponents(result, originalSentence) {
           }
         });
         const avgStress = count > 0 ? sumStress / count : 100;
-        // Ngưỡng đánh giá cho stressed (có thể điều chỉnh)
         if (avgStress < 70) {
           stressedIssues.incorrect.push(wordObj.word);
         } else if (avgStress < 85) {
@@ -166,8 +164,6 @@ export default function Home() {
   const [audioBlob, setAudioBlob] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
   const [loading, setLoading] = useState(false);
-  // State cho nội dung đánh giá (textbox đánh giá)
-  const [evaluationContent, setEvaluationContent] = useState("");
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -187,10 +183,6 @@ export default function Home() {
 
   const handleTextChange = (e) => {
     setText(e.target.value);
-  };
-
-  const handleEvaluationContentChange = (e) => {
-    setEvaluationContent(e.target.value);
   };
 
   const startRecording = async () => {
@@ -329,15 +321,6 @@ export default function Home() {
         />
       </div>
 
-      <div className="evaluation-textbox">
-        <label>Nội dung đánh giá:</label>
-        <textarea
-          value={evaluationContent}
-          onChange={handleEvaluationContentChange}
-          placeholder="Nhập nội dung đánh giá của bạn..."
-        />
-      </div>
-
       <div className="recording-section">
         <label>Ghi âm trực tiếp:</label>
         <div className="recording-buttons">
@@ -438,7 +421,6 @@ export default function Home() {
         .textbox-container {
           margin-bottom: 1.5rem;
           text-align: left;
-          /* Xóa nền trắng */
           background: none;
           padding: 0;
           border-radius: 0;
@@ -459,34 +441,9 @@ export default function Home() {
           border-color: #0070f3;
           outline: none;
         }
-        .evaluation-textbox {
-          margin-bottom: 1.5rem;
-          text-align: left;
-          /* Giữ nền trắng cho textbox đánh giá nếu cần */
-          background: none;
-          padding: 0;
-          border-radius: 0;
-        }
-        .evaluation-textbox label {
-          font-weight: bold;
-          color: #fff;
-        }
-        .evaluation-textbox textarea {
-          width: 100%;
-          padding: 0.75rem;
-          border: 1px solid #ccc;
-          border-radius: 4px;
-          font-size: 1rem;
-          transition: border-color 0.3s;
-        }
-        .evaluation-textbox textarea:focus {
-          border-color: #0070f3;
-          outline: none;
-        }
         .recording-section {
           margin-bottom: 1.5rem;
           text-align: left;
-          /* Xóa nền trắng */
           background: none;
           padding: 0;
           border-radius: 0;
@@ -534,7 +491,6 @@ export default function Home() {
           padding: 1rem;
           border: 1px solid #ddd;
           border-radius: 4px;
-          /* Thêm nền trắng cho phần đánh giá tự động */
           background: #fff;
           font-size: 1.4rem;
           white-space: pre-wrap;
