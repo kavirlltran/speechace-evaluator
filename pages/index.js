@@ -41,6 +41,7 @@ function getDetailedSummaryComponents(result, originalSentence) {
     const wordClean = wordObj.word.toLowerCase();
     // Nhóm normal: từ không có dấu nhấn trong bản gốc
     if (normalWords.includes(wordClean)) {
+      // Ngưỡng đánh giá cho normal (có thể điều chỉnh)
       if (wordObj.quality_score < 40) {
         normalIssues.incorrect.push(wordObj.word);
       } else if (wordObj.quality_score < 70) {
@@ -50,7 +51,8 @@ function getDetailedSummaryComponents(result, originalSentence) {
     // Nhóm stressed: từ có dấu nhấn trong bản gốc
     else if (stressedWords.includes(wordClean)) {
       if (wordObj.phone_score_list) {
-        let sumStress = 0, count = 0;
+        let sumStress = 0,
+          count = 0;
         wordObj.phone_score_list.forEach((phone) => {
           if (typeof phone.stress_score !== "undefined") {
             sumStress += phone.stress_score;
@@ -58,6 +60,7 @@ function getDetailedSummaryComponents(result, originalSentence) {
           }
         });
         const avgStress = count > 0 ? sumStress / count : 100;
+        // Ngưỡng đánh giá cho stressed (có thể điều chỉnh)
         if (avgStress < 70) {
           stressedIssues.incorrect.push(wordObj.word);
         } else if (avgStress < 85) {
@@ -135,7 +138,7 @@ function EvaluationResults({ result, originalSentence }) {
 }
 
 export default function Home() {
-  // Danh sách câu mẫu cho Practice 1 (bản gốc có dấu nhấn)
+  // Danh sách câu mẫu cho Practice 1 (bản gốc chứa dấu nhấn)
   const practice1List = [
     "We should ‘finish the ‘project for our ‘history ‘class.",
     "Peter is re’vising for his e’xam ‘next ‘week.",
@@ -435,12 +438,14 @@ export default function Home() {
         .textbox-container {
           margin-bottom: 1.5rem;
           text-align: left;
-          background: rgba(255, 255, 255, 0.8);
-          padding: 1rem;
-          border-radius: 8px;
+          /* Xóa nền trắng */
+          background: none;
+          padding: 0;
+          border-radius: 0;
         }
         .textbox-container label {
           font-weight: bold;
+          color: #fff;
         }
         .textbox-container textarea {
           width: 100%;
@@ -457,12 +462,14 @@ export default function Home() {
         .evaluation-textbox {
           margin-bottom: 1.5rem;
           text-align: left;
-          background: rgba(255, 255, 255, 0.8);
-          padding: 1rem;
-          border-radius: 8px;
+          /* Giữ nền trắng cho textbox đánh giá nếu cần */
+          background: none;
+          padding: 0;
+          border-radius: 0;
         }
         .evaluation-textbox label {
           font-weight: bold;
+          color: #fff;
         }
         .evaluation-textbox textarea {
           width: 100%;
@@ -479,9 +486,10 @@ export default function Home() {
         .recording-section {
           margin-bottom: 1.5rem;
           text-align: left;
-          background: rgba(255, 255, 255, 0.8);
-          padding: 1rem;
-          border-radius: 8px;
+          /* Xóa nền trắng */
+          background: none;
+          padding: 0;
+          border-radius: 0;
         }
         .recording-buttons button {
           padding: 0.5rem 1rem;
@@ -526,7 +534,8 @@ export default function Home() {
           padding: 1rem;
           border: 1px solid #ddd;
           border-radius: 4px;
-          background: rgba(255, 255, 255, 0.9);
+          /* Thêm nền trắng cho phần đánh giá tự động */
+          background: #fff;
           font-size: 1.4rem;
           white-space: pre-wrap;
         }
