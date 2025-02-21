@@ -1,57 +1,78 @@
 // pages/index.js
 import { useState, useRef } from 'react';
 
-// Hàm loại bỏ ký tự đánh dấu (apostrophes)
+// Hàm loại bỏ các dấu nhấn (apostrophes) khỏi câu
 const cleanSentence = (sentence) => {
   // Loại bỏ các ký tự: ‘, ’, '
   return sentence.replace(/[‘’']/g, "");
 };
 
-function EvaluationResults({ result }) {
-  if (!result || !result.text_score || !result.text_score.word_score_list) return null;
-  
-  const words = result.text_score.word_score_list;
+// Hàm đánh giá: chỉ xem xét các từ có dấu trong câu gốc (originalSentence)
+function getDetailedSummary(result, originalSentence) {
+  if (
+    !result ||
+    !result.text_score ||
+    !result.text_score.word_score_list ||
+    !originalSentence
+  )
+    return "";
+
+  // Tìm các từ có chứa dấu nhấn trong câu gốc
+  const markedWords = originalSentence.match(/\S*[‘’']\S*/g) || [];
+  // Làm sạch để so sánh (chuyển về chữ thường)
+  const markedWordsCleaned = markedWords.map((w) =>
+    cleanSentence(w).toLowerCase()
+  );
+
   let mispronounced = [];
   let stressIssues = [];
-  
-  words.forEach((word) => {
-    // Nếu quality_score < 60 => phát âm chưa đúng
-    if (word.quality_score < 60) {
-      mispronounced.push(word.word);
+
+  result.text_score.word_score_list.forEach((wordObj) => {
+    // Chỉ xét những từ mà khi làm sạch có nằm trong danh sách markedWordsCleaned
+    const wordClean = wordObj.word.toLowerCase();
+    if (!markedWordsCleaned.includes(wordClean)) return;
+
+    // Nếu chất lượng phát âm nhỏ hơn 60 => phát âm chưa đúng
+    if (wordObj.quality_score < 60) {
+      mispronounced.push(wordObj.word);
     }
-    // Kiểm tra từng phone: nếu có stress_score < 90 => trọng âm cần cải thiện
-    if (word.phone_score_list) {
-      const hasStressIssue = word.phone_score_list.some((phone) => {
-        return typeof phone.stress_score !== 'undefined' && phone.stress_score < 90;
-      });
+    // Kiểm tra trọng âm: nếu có phone nào có stress_score dưới 90 thì coi là cần cải thiện trọng âm
+    if (wordObj.phone_score_list) {
+      const hasStressIssue = wordObj.phone_score_list.some(
+        (phone) =>
+          typeof phone.stress_score !== "undefined" && phone.stress_score < 90
+      );
       if (hasStressIssue) {
-        stressIssues.push(word.word);
+        stressIssues.push(wordObj.word);
       }
     }
   });
-  
+
+  let messages = [];
+  if (mispronounced.length > 0) {
+    messages.push("Các từ phát âm chưa đúng: " + mispronounced.join(", "));
+  }
+  if (stressIssues.length > 0) {
+    messages.push("Các từ cần cải thiện trọng âm: " + stressIssues.join(", "));
+  }
+  if (messages.length === 0) {
+    messages.push("Phát âm của bạn rất chính xác và trọng âm đã được nhấn đúng.");
+  }
+  return messages.join(". ");
+}
+
+// Component hiển thị kết quả đánh giá
+function EvaluationResults({ result, originalSentence }) {
   return (
     <div className="evaluation-summary">
       <h2>Kết quả đánh giá</h2>
-      {mispronounced.length > 0 && (
-        <p>
-          <strong>Các từ phát âm chưa đúng:</strong> {mispronounced.join(", ")}
-        </p>
-      )}
-      {stressIssues.length > 0 && (
-        <p>
-          <strong>Các từ cần cải thiện trọng âm:</strong> {stressIssues.join(", ")}
-        </p>
-      )}
-      {mispronounced.length === 0 && stressIssues.length === 0 && (
-        <p>Phát âm của bạn rất chính xác và trọng âm đã được nhấn đúng.</p>
-      )}
+      <p>{getDetailedSummary(result, originalSentence)}</p>
     </div>
   );
 }
 
 export default function Home() {
-  // Danh sách câu mẫu cho Practice 1 (các dấu đánh dấu chỉ dùng để chỉ ra từ cần nhấn, nhưng sẽ được ẩn khi hiển thị)
+  // Danh sách câu mẫu cho Practice 1 (các dấu nhấn được đánh dấu trong câu)
   const practice1List = [
     "We should ‘finish the ‘project for our ‘history ‘class.",
     "Peter is re’vising for his e’xam ‘next ‘week.",
@@ -70,7 +91,10 @@ export default function Home() {
   ];
 
   const [selectedPractice, setSelectedPractice] = useState("practice1");
-  const [text, setText] = useState('');
+  // Lưu trữ nội dung đã làm sạch để gửi đi API
+  const [text, setText] = useState("");
+  // Lưu trữ câu gốc (có dấu nhấn) để dùng cho đánh giá
+  const [originalSentence, setOriginalSentence] = useState("");
   const [result, setResult] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
   const [audioBlob, setAudioBlob] = useState(null);
@@ -80,15 +104,17 @@ export default function Home() {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
-  // Khi người dùng chọn câu mẫu, hiển thị nội dung đã được làm sạch dấu
+  // Khi người dùng chọn câu mẫu, lưu cả câu gốc và phiên bản làm sạch
   const handleSelectSentence = (sentence) => {
+    setOriginalSentence(sentence);
     setText(cleanSentence(sentence));
   };
 
   // Chuyển đổi giữa Practice 1 và Practice 2
   const handlePracticeSwitch = (practice) => {
     setSelectedPractice(practice);
-    setText('');
+    setText("");
+    setOriginalSentence("");
   };
 
   const handleTextChange = (e) => {
@@ -96,9 +122,9 @@ export default function Home() {
   };
 
   const startRecording = async () => {
-    // Kiểm tra xem trình duyệt có hỗ trợ getUserMedia và MediaRecorder không
+    // Kiểm tra hỗ trợ getUserMedia và MediaRecorder
     if (!navigator.mediaDevices) {
-      alert('Trình duyệt của bạn không hỗ trợ ghi âm.');
+      alert("Trình duyệt của bạn không hỗ trợ ghi âm.");
       return;
     }
     if (typeof MediaRecorder === "undefined") {
@@ -107,40 +133,33 @@ export default function Home() {
     }
     
     try {
-      // Yêu cầu quyền truy cập microphone
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      
-      // Tạo đối tượng MediaRecorder
       mediaRecorderRef.current = new MediaRecorder(stream);
       audioChunksRef.current = [];
       
-      // Khi có dữ liệu ghi âm
       mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
       
-      // Khi dừng ghi âm, tạo Blob và hiển thị audio preview
       mediaRecorderRef.current.onstop = () => {
-        const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
         setAudioBlob(blob);
         const url = URL.createObjectURL(blob);
         setAudioUrl(url);
       };
       
-      // Lắng nghe sự kiện lỗi và hiển thị thông báo lỗi
       mediaRecorderRef.current.onerror = (event) => {
         console.error("MediaRecorder error: ", event.error);
         alert("Đã xảy ra lỗi khi ghi âm: " + event.error.message);
       };
 
-      // Bắt đầu ghi âm
       mediaRecorderRef.current.start();
       setIsRecording(true);
     } catch (error) {
-      console.error('Lỗi khi ghi âm:', error);
-      alert('Không thể ghi âm. Vui lòng kiểm tra quyền microphone của bạn.');
+      console.error("Lỗi khi ghi âm:", error);
+      alert("Không thể ghi âm. Vui lòng kiểm tra quyền microphone của bạn.");
     }
   };
 
@@ -154,26 +173,26 @@ export default function Home() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!text || !audioBlob) {
-      alert('Vui lòng chọn nội dung và ghi âm để đánh giá.');
+      alert("Vui lòng chọn nội dung và ghi âm để đánh giá.");
       return;
     }
     setLoading(true);
 
-    const audioFile = new File([audioBlob], 'recording.webm', { type: 'audio/webm' });
+    const audioFile = new File([audioBlob], "recording.webm", { type: "audio/webm" });
     const formData = new FormData();
-    formData.append('text', text);
-    formData.append('user_audio_file', audioFile);
+    formData.append("text", text);
+    formData.append("user_audio_file", audioFile);
 
     try {
-      const res = await fetch('/api/evaluate', {
-        method: 'POST',
+      const res = await fetch("/api/evaluate", {
+        method: "POST",
         body: formData,
       });
       const data = await res.json();
       setResult(data);
     } catch (error) {
-      console.error('Lỗi khi gọi API:', error);
-      setResult({ error: 'Có lỗi xảy ra khi gọi API.' });
+      console.error("Lỗi khi gọi API:", error);
+      setResult({ error: "Có lỗi xảy ra khi gọi API." });
     }
     setLoading(false);
   };
@@ -203,7 +222,9 @@ export default function Home() {
             <div
               key={idx}
               onClick={() => handleSelectSentence(sentence)}
-              className={`sentence ${text === cleanSentence(sentence) ? "selected" : ""}`}
+              className={`sentence ${
+                text === cleanSentence(sentence) ? "selected" : ""
+              }`}
             >
               {cleanSentence(sentence)}
             </div>
@@ -216,7 +237,9 @@ export default function Home() {
             <div
               key={idx}
               onClick={() => handleSelectSentence(sentence)}
-              className={`sentence ${text === cleanSentence(sentence) ? "selected" : ""}`}
+              className={`sentence ${
+                text === cleanSentence(sentence) ? "selected" : ""
+              }`}
             >
               {cleanSentence(sentence)}
             </div>
@@ -257,11 +280,13 @@ export default function Home() {
 
       <form onSubmit={handleSubmit} className="submit-form">
         <button type="submit" disabled={loading}>
-          {loading ? 'Đang đánh giá...' : 'Đánh giá phát âm'}
+          {loading ? "Đang đánh giá..." : "Đánh giá phát âm"}
         </button>
       </form>
 
-      {result && result.status === "success" && <EvaluationResults result={result} />}
+      {result && result.status === "success" && (
+        <EvaluationResults result={result} originalSentence={originalSentence} />
+      )}
       {result && result.error && (
         <div className="error-message">
           <h2>Lỗi:</h2>
