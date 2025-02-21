@@ -36,12 +36,11 @@ function getDetailedSummaryComponents(result, originalSentence) {
   const normalIssues = { incorrect: [], improvement: [] };
   const stressedIssues = { incorrect: [], improvement: [] };
 
-  // Duyệt qua kết quả từ API và chỉ xét các từ mà bản gốc có chứa dấu nhấn cho nhóm stressed
+  // Duyệt qua kết quả từ API và chỉ xét các từ theo nhóm dựa trên bản gốc
   result.text_score.word_score_list.forEach((wordObj) => {
     const wordClean = wordObj.word.toLowerCase();
     // Nhóm normal: từ không có dấu nhấn trong bản gốc
     if (normalWords.includes(wordClean)) {
-      // Ngưỡng đánh giá cho normal (có thể điều chỉnh)
       if (wordObj.quality_score < 40) {
         normalIssues.incorrect.push(wordObj.word);
       } else if (wordObj.quality_score < 70) {
@@ -51,8 +50,7 @@ function getDetailedSummaryComponents(result, originalSentence) {
     // Nhóm stressed: từ có dấu nhấn trong bản gốc
     else if (stressedWords.includes(wordClean)) {
       if (wordObj.phone_score_list) {
-        let sumStress = 0,
-          count = 0;
+        let sumStress = 0, count = 0;
         wordObj.phone_score_list.forEach((phone) => {
           if (typeof phone.stress_score !== "undefined") {
             sumStress += phone.stress_score;
@@ -60,7 +58,6 @@ function getDetailedSummaryComponents(result, originalSentence) {
           }
         });
         const avgStress = count > 0 ? sumStress / count : 100;
-        // Ngưỡng đánh giá cho stressed (có thể điều chỉnh)
         if (avgStress < 70) {
           stressedIssues.incorrect.push(wordObj.word);
         } else if (avgStress < 85) {
@@ -138,7 +135,7 @@ function EvaluationResults({ result, originalSentence }) {
 }
 
 export default function Home() {
-  // Danh sách câu mẫu cho Practice 1 (bản gốc chứa dấu nhấn)
+  // Danh sách câu mẫu cho Practice 1 (bản gốc có dấu nhấn)
   const practice1List = [
     "We should ‘finish the ‘project for our ‘history ‘class.",
     "Peter is re’vising for his e’xam ‘next ‘week.",
@@ -166,6 +163,8 @@ export default function Home() {
   const [audioBlob, setAudioBlob] = useState(null);
   const [audioUrl, setAudioUrl] = useState(null);
   const [loading, setLoading] = useState(false);
+  // State cho nội dung đánh giá (textbox đánh giá)
+  const [evaluationContent, setEvaluationContent] = useState("");
 
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
@@ -185,6 +184,10 @@ export default function Home() {
 
   const handleTextChange = (e) => {
     setText(e.target.value);
+  };
+
+  const handleEvaluationContentChange = (e) => {
+    setEvaluationContent(e.target.value);
   };
 
   const startRecording = async () => {
@@ -264,6 +267,7 @@ export default function Home() {
 
   return (
     <div className="container">
+      <div className="signature">By Luong Kieu Trang</div>
       <h1>Speechace Pronunciation Evaluator</h1>
 
       <div className="practice-switch">
@@ -322,6 +326,15 @@ export default function Home() {
         />
       </div>
 
+      <div className="evaluation-textbox">
+        <label>Nội dung đánh giá:</label>
+        <textarea
+          value={evaluationContent}
+          onChange={handleEvaluationContentChange}
+          placeholder="Nhập nội dung đánh giá của bạn..."
+        />
+      </div>
+
       <div className="recording-section">
         <label>Ghi âm trực tiếp:</label>
         <div className="recording-buttons">
@@ -361,6 +374,7 @@ export default function Home() {
 
       <style jsx>{`
         .container {
+          position: relative;
           max-width: 800px;
           margin: 0 auto;
           padding: 2rem;
@@ -369,6 +383,14 @@ export default function Home() {
           background: url("/nen xanh.jpg") no-repeat center center;
           background-size: cover;
           min-height: 100vh;
+        }
+        .signature {
+          position: absolute;
+          top: 10px;
+          right: 10px;
+          color: yellow;
+          font-weight: bold;
+          font-size: 1.2rem;
         }
         h1 {
           margin-bottom: 1.5rem;
@@ -429,6 +451,28 @@ export default function Home() {
           transition: border-color 0.3s;
         }
         .textbox-container textarea:focus {
+          border-color: #0070f3;
+          outline: none;
+        }
+        .evaluation-textbox {
+          margin-bottom: 1.5rem;
+          text-align: left;
+          background: rgba(255, 255, 255, 0.8);
+          padding: 1rem;
+          border-radius: 8px;
+        }
+        .evaluation-textbox label {
+          font-weight: bold;
+        }
+        .evaluation-textbox textarea {
+          width: 100%;
+          padding: 0.75rem;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          font-size: 1rem;
+          transition: border-color 0.3s;
+        }
+        .evaluation-textbox textarea:focus {
           border-color: #0070f3;
           outline: none;
         }
