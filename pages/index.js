@@ -1,7 +1,12 @@
 // pages/index.js
 import { useState, useRef } from 'react';
 
-// Component đánh giá kết quả (tóm tắt các từ cần cải thiện)
+// Hàm loại bỏ ký tự đánh dấu (apostrophes)
+const cleanSentence = (sentence) => {
+  // Loại bỏ các ký tự: ‘, ’, '
+  return sentence.replace(/[‘’']/g, "");
+};
+
 function EvaluationResults({ result }) {
   if (!result || !result.text_score || !result.text_score.word_score_list) return null;
   
@@ -14,7 +19,7 @@ function EvaluationResults({ result }) {
     if (word.quality_score < 60) {
       mispronounced.push(word.word);
     }
-    // Kiểm tra từng phone, nếu có stress_score nhỏ hơn 90 => trọng âm cần cải thiện
+    // Kiểm tra từng phone: nếu có stress_score < 90 => trọng âm cần cải thiện
     if (word.phone_score_list) {
       const hasStressIssue = word.phone_score_list.some((phone) => {
         return typeof phone.stress_score !== 'undefined' && phone.stress_score < 90;
@@ -46,22 +51,22 @@ function EvaluationResults({ result }) {
 }
 
 export default function Home() {
-  // Danh sách câu mẫu cho Practice 1
+  // Danh sách câu mẫu cho Practice 1 (các dấu đánh dấu chỉ dùng để chỉ ra từ cần nhấn, nhưng sẽ được ẩn khi hiển thị)
   const practice1List = [
-    "We should finish the project for our history class.",
-    "Peter is revising for his exam next week.",
-    "Students will spend more time working with other classmates.",
-    "I like to watch videos that help me learn new things.",
-    "I have installed some apps on my phone.",
+    "We should ‘finish the ‘project for our ‘history ‘class.",
+    "Peter is re’vising for his e’xam ‘next ‘week.",
+    "‘Students will ‘spend more ‘time ‘working with ‘other ‘classmates.",
+    "I ‘like to ‘watch ‘videos that ‘help me ‘learn ‘new ‘things.",
+    "I have in’stalled some ‘apps on my ‘phone."
   ];
 
-  // Danh sách câu mẫu cho Practice 2 (bao gồm 2 câu mới)
+  // Danh sách câu mẫu cho Practice 2
   const practice2List = [
-    "Our teacher often gives us videos to watch at home.",
-    "I never read books on my tablet at night.",
-    "It is a new way of learning and students really like it.",
-    "You can find a lot of useful tips on this website.",
-    "They should make an outline for their presentation.",
+    "Our 'teacher 'often 'gives us 'videos to 'watch at 'home.",
+    "I 'never 'read 'books on my 'tablet at 'night.",
+    "It is a 'new 'way of 'learning and 'students 'really 'like it.",
+    "You can 'find a lot of 'useful tips on this 'website.",
+    "They should 'make an 'outline for their 'presentation."
   ];
 
   const [selectedPractice, setSelectedPractice] = useState("practice1");
@@ -75,9 +80,9 @@ export default function Home() {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
-  // Chọn câu mẫu để điền vào textbox
+  // Khi người dùng chọn câu mẫu, hiển thị nội dung đã được làm sạch dấu
   const handleSelectSentence = (sentence) => {
-    setText(sentence);
+    setText(cleanSentence(sentence));
   };
 
   // Chuyển đổi giữa Practice 1 và Practice 2
@@ -198,9 +203,9 @@ export default function Home() {
             <div
               key={idx}
               onClick={() => handleSelectSentence(sentence)}
-              className={`sentence ${text === sentence ? "selected" : ""}`}
+              className={`sentence ${text === cleanSentence(sentence) ? "selected" : ""}`}
             >
-              {sentence}
+              {cleanSentence(sentence)}
             </div>
           ))}
         </div>
@@ -211,9 +216,9 @@ export default function Home() {
             <div
               key={idx}
               onClick={() => handleSelectSentence(sentence)}
-              className={`sentence ${text === sentence ? "selected" : ""}`}
+              className={`sentence ${text === cleanSentence(sentence) ? "selected" : ""}`}
             >
-              {sentence}
+              {cleanSentence(sentence)}
             </div>
           ))}
         </div>
