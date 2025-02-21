@@ -1,13 +1,16 @@
 // pages/index.js
 import { useState, useRef } from 'react';
 
-// Hàm loại bỏ các dấu nhấn (apostrophes) khỏi câu
+// Hàm loại bỏ dấu nhấn khỏi từ (để gửi API và so sánh)
 const cleanSentence = (sentence) => {
   // Loại bỏ các ký tự: ‘, ’, '
   return sentence.replace(/[‘’']/g, "");
 };
 
-// Hàm đánh giá: chỉ xem xét các từ có dấu trong câu gốc (originalSentence)
+// Hàm xác định xem từ có dấu nhấn hay không (theo bản gốc)
+const isStressed = (word) => /[‘’']/.test(word);
+
+// Hàm đánh giá, chia làm 2 dòng: dòng 1 cho các từ thông thường, dòng 2 cho các từ trọng âm
 function getDetailedSummary(result, originalSentence) {
   if (
     !result ||
@@ -17,48 +20,80 @@ function getDetailedSummary(result, originalSentence) {
   )
     return "";
 
-  // Tìm các từ có chứa dấu nhấn trong câu gốc
-  const markedWords = originalSentence.match(/\S*[‘’']\S*/g) || [];
-  // Làm sạch để so sánh (chuyển về chữ thường)
-  const markedWordsCleaned = markedWords.map((w) =>
-    cleanSentence(w).toLowerCase()
-  );
-
-  let mispronounced = [];
-  let stressIssues = [];
-
-  result.text_score.word_score_list.forEach((wordObj) => {
-    // Chỉ xét những từ mà khi làm sạch có nằm trong danh sách markedWordsCleaned
-    const wordClean = wordObj.word.toLowerCase();
-    if (!markedWordsCleaned.includes(wordClean)) return;
-
-    // Nếu chất lượng phát âm nhỏ hơn 60 => phát âm chưa đúng
-    if (wordObj.quality_score < 60) {
-      mispronounced.push(wordObj.word);
+  // Tách các từ từ câu gốc
+  const originalWords = originalSentence.split(/\s+/).filter(Boolean);
+  // Tạo 2 set để lưu từ đã làm sạch (lowercase)
+  const stressedSet = new Set();
+  const normalSet = new Set();
+  originalWords.forEach((word) => {
+    const cleaned = cleanSentence(word).toLowerCase();
+    if (isStressed(word)) {
+      stressedSet.add(cleaned);
+    } else {
+      normalSet.add(cleaned);
     }
-    // Kiểm tra trọng âm: nếu có phone nào có stress_score dưới 90 thì coi là cần cải thiện trọng âm
-    if (wordObj.phone_score_list) {
-      const hasStressIssue = wordObj.phone_score_list.some(
-        (phone) =>
-          typeof phone.stress_score !== "undefined" && phone.stress_score < 90
-      );
-      if (hasStressIssue) {
-        stressIssues.push(wordObj.word);
+  });
+
+  // Khởi tạo đối tượng chứa đánh giá cho 2 nhóm
+  const normalIssues = { incorrect: [], improvement: [] };
+  const stressedIssues = { incorrect: [], improvement: [] };
+
+  // Đánh giá các từ dựa trên quality_score cho cả 2 nhóm (nhưng với stressed, ta dùng trung bình stress_score)
+  result.text_score.word_score_list.forEach((wordObj) => {
+    const wordClean = wordObj.word.toLowerCase();
+
+    // Nếu từ thuộc nhóm không có dấu nhấn (normal)
+    if (normalSet.has(wordClean)) {
+      if (wordObj.quality_score < 60) {
+        normalIssues.incorrect.push(wordObj.word);
+      } else if (wordObj.quality_score < 80) {
+        normalIssues.improvement.push(wordObj.word);
       }
     }
   });
 
-  let messages = [];
-  if (mispronounced.length > 0) {
-    messages.push("Các từ phát âm chưa đúng: " + mispronounced.join(", "));
+  // Đánh giá riêng cho các từ trọng âm dựa trên phone stress_score
+  result.text_score.word_score_list.forEach((wordObj) => {
+    const wordClean = wordObj.word.toLowerCase();
+    if (stressedSet.has(wordClean)) {
+      if (wordObj.phone_score_list) {
+        let sumStress = 0, count = 0;
+        wordObj.phone_score_list.forEach((phone) => {
+          if (typeof phone.stress_score !== "undefined") {
+            sumStress += phone.stress_score;
+            count++;
+          }
+        });
+        const avgStress = count > 0 ? sumStress / count : 100;
+        if (avgStress < 80) {
+          stressedIssues.incorrect.push(wordObj.word);
+        } else if (avgStress < 90) {
+          stressedIssues.improvement.push(wordObj.word);
+        }
+      }
+    }
+  });
+
+  // Xây dựng thông điệp cho dòng 1 (normal)
+  let normalMessage = "";
+  if (normalIssues.incorrect.length > 0) {
+    normalMessage += "Các từ phát âm chưa đúng: " + normalIssues.incorrect.join(", ");
   }
-  if (stressIssues.length > 0) {
-    messages.push("Các từ cần cải thiện trọng âm: " + stressIssues.join(", "));
+  if (normalIssues.improvement.length > 0) {
+    if (normalMessage) normalMessage += " | ";
+    normalMessage += "Các từ cần cải thiện: " + normalIssues.improvement.join(", ");
   }
-  if (messages.length === 0) {
-    messages.push("Phát âm của bạn rất chính xác và trọng âm đã được nhấn đúng.");
+  // Xây dựng thông điệp cho dòng 2 (stressed)
+  let stressedMessage = "";
+  if (stressedIssues.incorrect.length > 0) {
+    stressedMessage += "Các từ trọng âm phát âm chưa đúng: " + stressedIssues.incorrect.join(", ");
   }
-  return messages.join(". ");
+  if (stressedIssues.improvement.length > 0) {
+    if (stressedMessage) stressedMessage += " | ";
+    stressedMessage += "Các từ cần cải thiện trọng âm: " + stressedIssues.improvement.join(", ");
+  }
+
+  return normalMessage + "\n" + stressedMessage;
 }
 
 // Component hiển thị kết quả đánh giá
@@ -66,13 +101,13 @@ function EvaluationResults({ result, originalSentence }) {
   return (
     <div className="evaluation-summary">
       <h2>Kết quả đánh giá</h2>
-      <p>{getDetailedSummary(result, originalSentence)}</p>
+      <pre>{getDetailedSummary(result, originalSentence)}</pre>
     </div>
   );
 }
 
 export default function Home() {
-  // Danh sách câu mẫu cho Practice 1 (các dấu nhấn được đánh dấu trong câu)
+  // Danh sách câu mẫu cho Practice 1 (các dấu nhấn được đánh dấu trong câu gốc)
   const practice1List = [
     "We should ‘finish the ‘project for our ‘history ‘class.",
     "Peter is re’vising for his e’xam ‘next ‘week.",
@@ -91,9 +126,9 @@ export default function Home() {
   ];
 
   const [selectedPractice, setSelectedPractice] = useState("practice1");
-  // Lưu trữ nội dung đã làm sạch để gửi đi API
+  // State chứa nội dung đã làm sạch để gửi lên API
   const [text, setText] = useState("");
-  // Lưu trữ câu gốc (có dấu nhấn) để dùng cho đánh giá
+  // State chứa bản gốc (có dấu nhấn) để đánh giá
   const [originalSentence, setOriginalSentence] = useState("");
   const [result, setResult] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -104,7 +139,7 @@ export default function Home() {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
-  // Khi người dùng chọn câu mẫu, lưu cả câu gốc và phiên bản làm sạch
+  // Khi chọn câu mẫu, lưu cả bản gốc và phiên bản làm sạch cho textbox
   const handleSelectSentence = (sentence) => {
     setOriginalSentence(sentence);
     setText(cleanSentence(sentence));
@@ -122,7 +157,6 @@ export default function Home() {
   };
 
   const startRecording = async () => {
-    // Kiểm tra hỗ trợ getUserMedia và MediaRecorder
     if (!navigator.mediaDevices) {
       alert("Trình duyệt của bạn không hỗ trợ ghi âm.");
       return;
