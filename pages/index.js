@@ -1,35 +1,48 @@
+// pages/index.js
 import { useState, useRef } from 'react';
 
-// Hàm tính toán và tạo thông điệp đánh giá chi tiết dựa trên chất lượng phát âm của từng từ
-function getDetailedSummary(result) {
-  if (!result || !result.text_score || !result.text_score.word_score_list) return '';
+// Component đánh giá kết quả (tóm tắt các từ cần cải thiện)
+function EvaluationResults({ result }) {
+  if (!result || !result.text_score || !result.text_score.word_score_list) return null;
   
   const words = result.text_score.word_score_list;
   let mispronounced = [];
-  let needsImprovement = [];
+  let stressIssues = [];
   
   words.forEach((word) => {
-    // Sử dụng quality_score của từng từ để đánh giá:
-    // Nếu quality_score < 60 => Phát âm sai
-    // Nếu quality_score từ 60 đến dưới 80 => Cần cải thiện
+    // Nếu quality_score < 60 => phát âm chưa đúng
     if (word.quality_score < 60) {
       mispronounced.push(word.word);
-    } else if (word.quality_score < 80) {
-      needsImprovement.push(word.word);
+    }
+    // Kiểm tra từng phone, nếu có stress_score nhỏ hơn 90 => trọng âm cần cải thiện
+    if (word.phone_score_list) {
+      const hasStressIssue = word.phone_score_list.some((phone) => {
+        return typeof phone.stress_score !== 'undefined' && phone.stress_score < 90;
+      });
+      if (hasStressIssue) {
+        stressIssues.push(word.word);
+      }
     }
   });
   
-  let messages = [];
-  if (mispronounced.length > 0) {
-    messages.push("Các từ phát âm sai: " + mispronounced.join(", "));
-  }
-  if (needsImprovement.length > 0) {
-    messages.push("Các từ cần cải thiện: " + needsImprovement.join(", "));
-  }
-  if (messages.length === 0) {
-    messages.push("Phát âm của bạn rất chính xác.");
-  }
-  return messages.join(". ");
+  return (
+    <div className="evaluation-summary">
+      <h2>Kết quả đánh giá</h2>
+      {mispronounced.length > 0 && (
+        <p>
+          <strong>Các từ phát âm chưa đúng:</strong> {mispronounced.join(", ")}
+        </p>
+      )}
+      {stressIssues.length > 0 && (
+        <p>
+          <strong>Các từ cần cải thiện trọng âm:</strong> {stressIssues.join(", ")}
+        </p>
+      )}
+      {mispronounced.length === 0 && stressIssues.length === 0 && (
+        <p>Phát âm của bạn rất chính xác và trọng âm đã được nhấn đúng.</p>
+      )}
+    </div>
+  );
 }
 
 export default function Home() {
@@ -62,7 +75,7 @@ export default function Home() {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
-  // Xử lý chọn câu mẫu
+  // Chọn câu mẫu để điền vào textbox
   const handleSelectSentence = (sentence) => {
     setText(sentence);
   };
@@ -78,25 +91,46 @@ export default function Home() {
   };
 
   const startRecording = async () => {
+    // Kiểm tra xem trình duyệt có hỗ trợ getUserMedia và MediaRecorder không
     if (!navigator.mediaDevices) {
       alert('Trình duyệt của bạn không hỗ trợ ghi âm.');
       return;
     }
+    if (typeof MediaRecorder === "undefined") {
+      alert("Trình duyệt của bạn không hỗ trợ tính năng ghi âm.");
+      return;
+    }
+    
     try {
+      // Yêu cầu quyền truy cập microphone
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      // Tạo đối tượng MediaRecorder
       mediaRecorderRef.current = new MediaRecorder(stream);
       audioChunksRef.current = [];
+      
+      // Khi có dữ liệu ghi âm
       mediaRecorderRef.current.ondataavailable = (event) => {
         if (event.data && event.data.size > 0) {
           audioChunksRef.current.push(event.data);
         }
       };
+      
+      // Khi dừng ghi âm, tạo Blob và hiển thị audio preview
       mediaRecorderRef.current.onstop = () => {
         const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
         setAudioBlob(blob);
         const url = URL.createObjectURL(blob);
         setAudioUrl(url);
       };
+      
+      // Lắng nghe sự kiện lỗi và hiển thị thông báo lỗi
+      mediaRecorderRef.current.onerror = (event) => {
+        console.error("MediaRecorder error: ", event.error);
+        alert("Đã xảy ra lỗi khi ghi âm: " + event.error.message);
+      };
+
+      // Bắt đầu ghi âm
       mediaRecorderRef.current.start();
       setIsRecording(true);
     } catch (error) {
@@ -119,10 +153,12 @@ export default function Home() {
       return;
     }
     setLoading(true);
+
     const audioFile = new File([audioBlob], 'recording.webm', { type: 'audio/webm' });
     const formData = new FormData();
     formData.append('text', text);
     formData.append('user_audio_file', audioFile);
+
     try {
       const res = await fetch('/api/evaluate', {
         method: 'POST',
@@ -220,12 +256,7 @@ export default function Home() {
         </button>
       </form>
 
-      {result && result.status === "success" && (
-        <div className="evaluation-summary">
-          <h2>Kết quả đánh giá</h2>
-          <p>{getDetailedSummary(result)}</p>
-        </div>
-      )}
+      {result && result.status === "success" && <EvaluationResults result={result} />}
       {result && result.error && (
         <div className="error-message">
           <h2>Lỗi:</h2>
@@ -332,6 +363,10 @@ export default function Home() {
         .submit-form button:hover {
           background: #005bb5;
         }
+        .error-message {
+          color: red;
+          margin-top: 1.5rem;
+        }
         .evaluation-summary {
           text-align: left;
           margin-top: 2rem;
@@ -339,10 +374,6 @@ export default function Home() {
           border: 1px solid #ddd;
           border-radius: 4px;
           background: #f9f9f9;
-        }
-        .error-message {
-          color: red;
-          margin-top: 1.5rem;
         }
       `}</style>
     </div>
