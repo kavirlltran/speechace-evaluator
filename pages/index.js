@@ -23,6 +23,7 @@ function getDetailedSummaryComponents(result, originalSentence) {
   const originalWords = originalSentence.split(/\s+/).filter(Boolean);
   const normalWords = [];
   const stressedWords = [];
+
   originalWords.forEach((word) => {
     const cleaned = cleanSentence(word).toLowerCase();
     if (isStressed(word)) {
@@ -36,10 +37,11 @@ function getDetailedSummaryComponents(result, originalSentence) {
   const normalIssues = { incorrect: [], improvement: [] };
   const stressedIssues = { incorrect: [], improvement: [] };
 
-  // Duyệt qua kết quả từ API và chỉ xét các từ theo nhóm dựa trên bản gốc
+  // Duyệt qua kết quả từ API, phân loại từ vào nhóm normal/stressed
   result.text_score.word_score_list.forEach((wordObj) => {
     const wordClean = wordObj.word.toLowerCase();
-    // Nhóm normal: từ không có dấu nhấn trong bản gốc
+
+    // Nhóm normal: từ không có dấu nhấn
     if (normalWords.includes(wordClean)) {
       if (wordObj.quality_score < 40) {
         normalIssues.incorrect.push(wordObj.word);
@@ -47,11 +49,11 @@ function getDetailedSummaryComponents(result, originalSentence) {
         normalIssues.improvement.push(wordObj.word);
       }
     }
-    // Nhóm stressed: từ có dấu nhấn trong bản gốc
+    // Nhóm stressed: từ có dấu nhấn
     else if (stressedWords.includes(wordClean)) {
       if (wordObj.phone_score_list) {
-        let sumStress = 0,
-          count = 0;
+        let sumStress = 0;
+        let count = 0;
         wordObj.phone_score_list.forEach((phone) => {
           if (typeof phone.stress_score !== "undefined") {
             sumStress += phone.stress_score;
@@ -68,7 +70,7 @@ function getDetailedSummaryComponents(result, originalSentence) {
     }
   });
 
-  // Tạo nội dung dòng 1 cho normal
+  // Tạo nội dung cho dòng 1 (normal)
   let normalContent;
   if (normalIssues.incorrect.length > 0 || normalIssues.improvement.length > 0) {
     normalContent = (
@@ -92,7 +94,7 @@ function getDetailedSummaryComponents(result, originalSentence) {
     normalContent = <span><strong>Phát âm tốt.</strong></span>;
   }
 
-  // Tạo nội dung dòng 2 cho stressed
+  // Tạo nội dung cho dòng 2 (stressed)
   let stressedContent;
   if (stressedIssues.incorrect.length > 0 || stressedIssues.improvement.length > 0) {
     stressedContent = (
@@ -185,6 +187,7 @@ export default function Home() {
     setText(e.target.value);
   };
 
+  // Bắt đầu ghi âm
   const startRecording = async () => {
     if (!navigator.mediaDevices) {
       alert("Trình duyệt của bạn không hỗ trợ ghi âm.");
@@ -226,6 +229,7 @@ export default function Home() {
     }
   };
 
+  // Dừng ghi âm
   const stopRecording = () => {
     if (mediaRecorderRef.current) {
       mediaRecorderRef.current.stop();
@@ -233,6 +237,7 @@ export default function Home() {
     }
   };
 
+  // Submit để gọi API đánh giá
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!text || !audioBlob) {
@@ -486,21 +491,27 @@ export default function Home() {
           border-radius: 8px;
         }
         .evaluation-summary {
+          margin: 2rem auto;
+          max-width: 600px;
+          padding: 1.5rem;
+          border: 2px solid #333;
+          border-radius: 8px;
+          background: rgba(255, 255, 255, 0.8);
+          box-shadow: 0 2px 6px rgba(0,0,0,0.2);
+          font-size: 1.2rem;
           text-align: left;
-          margin-top: 2rem;
-          padding: 1rem;
-          border: 1px solid #ddd;
-          border-radius: 4px;
-          background: #fff;
-          font-size: 1.4rem;
           white-space: pre-wrap;
+        }
+        .evaluation-summary h2 {
+          text-align: center;
+          margin-bottom: 1rem;
         }
         .evaluation-summary p {
           margin: 0.5rem 0;
         }
         @media (max-width: 600px) {
           .evaluation-summary {
-            font-size: 1.2rem;
+            font-size: 1.1rem;
           }
         }
       `}</style>
