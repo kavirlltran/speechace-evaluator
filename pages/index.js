@@ -1,38 +1,35 @@
 import { useState, useRef } from 'react';
 
-// Hàm tính điểm tổng hợp và trả về thông điệp đánh giá
-function getSummary(result) {
+// Hàm tính toán và tạo thông điệp đánh giá chi tiết dựa trên chất lượng phát âm của từng từ
+function getDetailedSummary(result) {
   if (!result || !result.text_score || !result.text_score.word_score_list) return '';
+  
   const words = result.text_score.word_score_list;
-  let totalQuality = 0;
-  let totalStress = 0;
-  let countStress = 0;
+  let mispronounced = [];
+  let needsImprovement = [];
   
   words.forEach((word) => {
-    totalQuality += word.quality_score;
-    if (word.phone_score_list) {
-      word.phone_score_list.forEach((phone) => {
-        if (typeof phone.stress_score !== 'undefined') {
-          totalStress += phone.stress_score;
-          countStress++;
-        }
-      });
+    // Sử dụng quality_score của từng từ để đánh giá:
+    // Nếu quality_score < 60 => Phát âm sai
+    // Nếu quality_score từ 60 đến dưới 80 => Cần cải thiện
+    if (word.quality_score < 60) {
+      mispronounced.push(word.word);
+    } else if (word.quality_score < 80) {
+      needsImprovement.push(word.word);
     }
   });
   
-  const avgQuality = totalQuality / words.length;
-  const avgStress = countStress ? totalStress / countStress : 0;
-  
-  const qualityMessage =
-    avgQuality >= 80
-      ? 'Phát âm của bạn rất chính xác.'
-      : 'Phát âm của bạn cần cải thiện.';
-  const stressMessage =
-    avgStress >= 90
-      ? 'Trọng âm của bạn được nhấn đúng.'
-      : 'Trọng âm của bạn cần cải thiện.';
-  
-  return `Đánh giá: ${qualityMessage} ${stressMessage}`;
+  let messages = [];
+  if (mispronounced.length > 0) {
+    messages.push("Các từ phát âm sai: " + mispronounced.join(", "));
+  }
+  if (needsImprovement.length > 0) {
+    messages.push("Các từ cần cải thiện: " + needsImprovement.join(", "));
+  }
+  if (messages.length === 0) {
+    messages.push("Phát âm của bạn rất chính xác.");
+  }
+  return messages.join(". ");
 }
 
 export default function Home() {
@@ -65,7 +62,7 @@ export default function Home() {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
-  // Chọn câu mẫu
+  // Xử lý chọn câu mẫu
   const handleSelectSentence = (sentence) => {
     setText(sentence);
   };
@@ -226,7 +223,7 @@ export default function Home() {
       {result && result.status === "success" && (
         <div className="evaluation-summary">
           <h2>Kết quả đánh giá</h2>
-          <p>{getSummary(result)}</p>
+          <p>{getDetailedSummary(result)}</p>
         </div>
       )}
       {result && result.error && (
@@ -335,10 +332,6 @@ export default function Home() {
         .submit-form button:hover {
           background: #005bb5;
         }
-        .error-message {
-          color: red;
-          margin-top: 1.5rem;
-        }
         .evaluation-summary {
           text-align: left;
           margin-top: 2rem;
@@ -346,6 +339,10 @@ export default function Home() {
           border: 1px solid #ddd;
           border-radius: 4px;
           background: #f9f9f9;
+        }
+        .error-message {
+          color: red;
+          margin-top: 1.5rem;
         }
       `}</style>
     </div>
