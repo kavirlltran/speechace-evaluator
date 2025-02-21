@@ -6,17 +6,18 @@ const cleanSentence = (sentence) => {
   return sentence.replace(/[‘’']/g, "");
 };
 
-// Hàm đánh giá được chia làm 2 dòng:
-// Dòng 1: Đánh giá các từ không có dấu (normal) dựa trên quality_score.
-// Dòng 2: Đánh giá các từ có dấu (stressed) dựa trên trung bình stress_score.
-function getDetailedSummary(result, originalSentence) {
+// Hàm xác định xem từ có được đánh dấu (stressed) hay không dựa trên dấu nhấn trong từ gốc
+const isStressed = (word) => /[‘’']/.test(word);
+
+// Hàm đánh giá và tạo các thành phần JSX cho 2 dòng đánh giá
+function getDetailedSummaryComponents(result, originalSentence) {
   if (
     !result ||
     !result.text_score ||
     !result.text_score.word_score_list ||
     !originalSentence
   )
-    return "";
+    return null;
 
   // Tách các từ từ câu gốc
   const originalWords = originalSentence.split(/\s+/).filter(Boolean);
@@ -24,7 +25,7 @@ function getDetailedSummary(result, originalSentence) {
   const stressedWords = [];
   originalWords.forEach((word) => {
     const cleaned = cleanSentence(word).toLowerCase();
-    if (/[‘’']/.test(word)) {
+    if (isStressed(word)) {
       stressedWords.push(cleaned);
     } else {
       normalWords.push(cleaned);
@@ -35,18 +36,19 @@ function getDetailedSummary(result, originalSentence) {
   const normalIssues = { incorrect: [], improvement: [] };
   const stressedIssues = { incorrect: [], improvement: [] };
 
-  // Duyệt qua kết quả của API
+  // Duyệt qua kết quả từ API và chỉ xét các từ mà bản gốc có chứa dấu nhấn cho nhóm stressed
   result.text_score.word_score_list.forEach((wordObj) => {
     const wordClean = wordObj.word.toLowerCase();
-    // Nếu từ thuộc nhóm normal
+    // Nhóm normal: từ không có dấu nhấn trong bản gốc
     if (normalWords.includes(wordClean)) {
+      // Ngưỡng đánh giá cho normal (có thể điều chỉnh)
       if (wordObj.quality_score < 40) {
         normalIssues.incorrect.push(wordObj.word);
       } else if (wordObj.quality_score < 70) {
         normalIssues.improvement.push(wordObj.word);
       }
     }
-    // Nếu từ thuộc nhóm stressed
+    // Nhóm stressed: từ có dấu nhấn trong bản gốc
     else if (stressedWords.includes(wordClean)) {
       if (wordObj.phone_score_list) {
         let sumStress = 0,
@@ -58,6 +60,7 @@ function getDetailedSummary(result, originalSentence) {
           }
         });
         const avgStress = count > 0 ? sumStress / count : 100;
+        // Ngưỡng đánh giá cho stressed (có thể điều chỉnh)
         if (avgStress < 70) {
           stressedIssues.incorrect.push(wordObj.word);
         } else if (avgStress < 85) {
@@ -67,45 +70,75 @@ function getDetailedSummary(result, originalSentence) {
     }
   });
 
-  let normalMessage = "";
-  if (normalIssues.incorrect.length > 0) {
-    normalMessage += "Các từ phát âm chưa đúng: " + normalIssues.incorrect.join(", ");
-  }
-  if (normalIssues.improvement.length > 0) {
-    if (normalMessage) normalMessage += " | ";
-    normalMessage += "Các từ cần cải thiện: " + normalIssues.improvement.join(", ");
-  }
-  if (!normalMessage) {
-    normalMessage = "Phát âm tốt.";
+  // Tạo nội dung dòng 1 cho normal
+  let normalContent;
+  if (normalIssues.incorrect.length > 0 || normalIssues.improvement.length > 0) {
+    normalContent = (
+      <>
+        {normalIssues.incorrect.length > 0 && (
+          <span>
+            <strong>Các từ phát âm chưa đúng:</strong> {normalIssues.incorrect.join(", ")}
+          </span>
+        )}
+        {normalIssues.improvement.length > 0 && (
+          <>
+            {normalIssues.incorrect.length > 0 && " | "}
+            <span>
+              <strong>Các từ cần cải thiện:</strong> {normalIssues.improvement.join(", ")}
+            </span>
+          </>
+        )}
+      </>
+    );
+  } else {
+    normalContent = <span><strong>Phát âm tốt.</strong></span>;
   }
 
-  let stressedMessage = "";
-  if (stressedIssues.incorrect.length > 0) {
-    stressedMessage += "Các từ trọng âm phát âm chưa đúng: " + stressedIssues.incorrect.join(", ");
-  }
-  if (stressedIssues.improvement.length > 0) {
-    if (stressedMessage) stressedMessage += " | ";
-    stressedMessage += "Các từ cần cải thiện trọng âm: " + stressedIssues.improvement.join(", ");
-  }
-  if (!stressedMessage) {
-    stressedMessage = "Trọng âm tốt.";
+  // Tạo nội dung dòng 2 cho stressed
+  let stressedContent;
+  if (stressedIssues.incorrect.length > 0 || stressedIssues.improvement.length > 0) {
+    stressedContent = (
+      <>
+        {stressedIssues.incorrect.length > 0 && (
+          <span>
+            <strong>Các từ trọng âm phát âm chưa đúng:</strong> {stressedIssues.incorrect.join(", ")}
+          </span>
+        )}
+        {stressedIssues.improvement.length > 0 && (
+          <>
+            {stressedIssues.incorrect.length > 0 && " | "}
+            <span>
+              <strong>Các từ cần cải thiện trọng âm:</strong> {stressedIssues.improvement.join(", ")}
+            </span>
+          </>
+        )}
+      </>
+    );
+  } else {
+    stressedContent = <span><strong>Trọng âm tốt.</strong></span>;
   }
 
-  return normalMessage + "\n" + stressedMessage;
+  return (
+    <>
+      <p>{normalContent}</p>
+      <p>{stressedContent}</p>
+    </>
+  );
 }
 
 // Component hiển thị kết quả đánh giá
 function EvaluationResults({ result, originalSentence }) {
+  const summaryComponents = getDetailedSummaryComponents(result, originalSentence);
   return (
     <div className="evaluation-summary">
       <h2>Kết quả đánh giá</h2>
-      <pre>{getDetailedSummary(result, originalSentence)}</pre>
+      {summaryComponents}
     </div>
   );
 }
 
 export default function Home() {
-  // Danh sách câu mẫu cho Practice 1 (có dấu nhấn được đánh dấu)
+  // Danh sách câu mẫu cho Practice 1 (bản gốc chứa dấu nhấn)
   const practice1List = [
     "We should ‘finish the ‘project for our ‘history ‘class.",
     "Peter is re’vising for his e’xam ‘next ‘week.",
@@ -124,9 +157,9 @@ export default function Home() {
   ];
 
   const [selectedPractice, setSelectedPractice] = useState("practice1");
-  // text: nội dung đã làm sạch (để gửi lên API)
+  // text: nội dung đã làm sạch để gửi lên API
   const [text, setText] = useState("");
-  // originalSentence: bản gốc có dấu nhấn (để đánh giá)
+  // originalSentence: bản gốc có dấu nhấn để đánh giá
   const [originalSentence, setOriginalSentence] = useState("");
   const [result, setResult] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -137,13 +170,13 @@ export default function Home() {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
-  // Khi chọn câu mẫu, lưu cả bản gốc và phiên bản làm sạch
+  // Khi người dùng chọn câu mẫu, lưu cả bản gốc và phiên bản làm sạch cho textbox
   const handleSelectSentence = (sentence) => {
     setOriginalSentence(sentence);
     setText(cleanSentence(sentence));
   };
 
-  // Chuyển đổi giữa Practice
+  // Chuyển đổi giữa Practice 1 và Practice 2
   const handlePracticeSwitch = (practice) => {
     setSelectedPractice(practice);
     setText("");
@@ -333,9 +366,13 @@ export default function Home() {
           padding: 2rem;
           text-align: center;
           font-family: Arial, sans-serif;
+          background: url("/nen xanh.jpg") no-repeat center center;
+          background-size: cover;
+          min-height: 100vh;
         }
         h1 {
           margin-bottom: 1.5rem;
+          color: #fff;
         }
         .practice-switch button {
           margin: 0 0.5rem;
@@ -358,6 +395,7 @@ export default function Home() {
           padding: 1rem;
           margin-bottom: 1.5rem;
           text-align: left;
+          background: rgba(255, 255, 255, 0.8);
         }
         .sentence {
           padding: 0.5rem;
@@ -375,6 +413,9 @@ export default function Home() {
         .textbox-container {
           margin-bottom: 1.5rem;
           text-align: left;
+          background: rgba(255, 255, 255, 0.8);
+          padding: 1rem;
+          border-radius: 8px;
         }
         .textbox-container label {
           font-weight: bold;
@@ -394,6 +435,9 @@ export default function Home() {
         .recording-section {
           margin-bottom: 1.5rem;
           text-align: left;
+          background: rgba(255, 255, 255, 0.8);
+          padding: 1rem;
+          border-radius: 8px;
         }
         .recording-buttons button {
           padding: 0.5rem 1rem;
@@ -428,6 +472,9 @@ export default function Home() {
         .error-message {
           color: red;
           margin-top: 1.5rem;
+          background: rgba(255, 255, 255, 0.8);
+          padding: 1rem;
+          border-radius: 8px;
         }
         .evaluation-summary {
           text-align: left;
@@ -435,9 +482,12 @@ export default function Home() {
           padding: 1rem;
           border: 1px solid #ddd;
           border-radius: 4px;
-          background: #f9f9f9;
+          background: rgba(255, 255, 255, 0.9);
           font-size: 1.4rem;
           white-space: pre-wrap;
+        }
+        .evaluation-summary p {
+          margin: 0.5rem 0;
         }
         @media (max-width: 600px) {
           .evaluation-summary {
