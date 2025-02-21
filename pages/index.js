@@ -1,16 +1,14 @@
 // pages/index.js
 import { useState, useRef } from 'react';
 
-// Hàm loại bỏ dấu nhấn khỏi từ (để gửi API và so sánh)
+// Hàm loại bỏ dấu nhấn khỏi câu (để gửi lên API)
 const cleanSentence = (sentence) => {
-  // Loại bỏ các ký tự: ‘, ’, '
   return sentence.replace(/[‘’']/g, "");
 };
 
-// Hàm xác định xem từ có dấu nhấn hay không (theo bản gốc)
-const isStressed = (word) => /[‘’']/.test(word);
-
-// Hàm đánh giá, chia làm 2 dòng: dòng 1 cho các từ thông thường, dòng 2 cho các từ trọng âm
+// Hàm đánh giá được chia làm 2 dòng:
+// Dòng 1: Đánh giá các từ không có dấu (normal) dựa trên quality_score.
+// Dòng 2: Đánh giá các từ có dấu (stressed) dựa trên trung bình stress_score.
 function getDetailedSummary(result, originalSentence) {
   if (
     !result ||
@@ -22,42 +20,37 @@ function getDetailedSummary(result, originalSentence) {
 
   // Tách các từ từ câu gốc
   const originalWords = originalSentence.split(/\s+/).filter(Boolean);
-  // Tạo 2 set để lưu từ đã làm sạch (lowercase)
-  const stressedSet = new Set();
-  const normalSet = new Set();
+  const normalWords = [];
+  const stressedWords = [];
   originalWords.forEach((word) => {
     const cleaned = cleanSentence(word).toLowerCase();
-    if (isStressed(word)) {
-      stressedSet.add(cleaned);
+    if (/[‘’']/.test(word)) {
+      stressedWords.push(cleaned);
     } else {
-      normalSet.add(cleaned);
+      normalWords.push(cleaned);
     }
   });
 
-  // Khởi tạo đối tượng chứa đánh giá cho 2 nhóm
+  // Khởi tạo đối tượng lưu trữ đánh giá cho 2 nhóm
   const normalIssues = { incorrect: [], improvement: [] };
   const stressedIssues = { incorrect: [], improvement: [] };
 
-  // Đánh giá các từ dựa trên quality_score cho cả 2 nhóm (nhưng với stressed, ta dùng trung bình stress_score)
+  // Duyệt qua kết quả của API
   result.text_score.word_score_list.forEach((wordObj) => {
     const wordClean = wordObj.word.toLowerCase();
-
-    // Nếu từ thuộc nhóm không có dấu nhấn (normal)
-    if (normalSet.has(wordClean)) {
-      if (wordObj.quality_score < 60) {
+    // Nếu từ thuộc nhóm normal
+    if (normalWords.includes(wordClean)) {
+      if (wordObj.quality_score < 40) {
         normalIssues.incorrect.push(wordObj.word);
-      } else if (wordObj.quality_score < 80) {
+      } else if (wordObj.quality_score < 70) {
         normalIssues.improvement.push(wordObj.word);
       }
     }
-  });
-
-  // Đánh giá riêng cho các từ trọng âm dựa trên phone stress_score
-  result.text_score.word_score_list.forEach((wordObj) => {
-    const wordClean = wordObj.word.toLowerCase();
-    if (stressedSet.has(wordClean)) {
+    // Nếu từ thuộc nhóm stressed
+    else if (stressedWords.includes(wordClean)) {
       if (wordObj.phone_score_list) {
-        let sumStress = 0, count = 0;
+        let sumStress = 0,
+          count = 0;
         wordObj.phone_score_list.forEach((phone) => {
           if (typeof phone.stress_score !== "undefined") {
             sumStress += phone.stress_score;
@@ -65,16 +58,15 @@ function getDetailedSummary(result, originalSentence) {
           }
         });
         const avgStress = count > 0 ? sumStress / count : 100;
-        if (avgStress < 80) {
+        if (avgStress < 70) {
           stressedIssues.incorrect.push(wordObj.word);
-        } else if (avgStress < 90) {
+        } else if (avgStress < 85) {
           stressedIssues.improvement.push(wordObj.word);
         }
       }
     }
   });
 
-  // Xây dựng thông điệp cho dòng 1 (normal)
   let normalMessage = "";
   if (normalIssues.incorrect.length > 0) {
     normalMessage += "Các từ phát âm chưa đúng: " + normalIssues.incorrect.join(", ");
@@ -83,7 +75,10 @@ function getDetailedSummary(result, originalSentence) {
     if (normalMessage) normalMessage += " | ";
     normalMessage += "Các từ cần cải thiện: " + normalIssues.improvement.join(", ");
   }
-  // Xây dựng thông điệp cho dòng 2 (stressed)
+  if (!normalMessage) {
+    normalMessage = "Phát âm tốt.";
+  }
+
   let stressedMessage = "";
   if (stressedIssues.incorrect.length > 0) {
     stressedMessage += "Các từ trọng âm phát âm chưa đúng: " + stressedIssues.incorrect.join(", ");
@@ -91,6 +86,9 @@ function getDetailedSummary(result, originalSentence) {
   if (stressedIssues.improvement.length > 0) {
     if (stressedMessage) stressedMessage += " | ";
     stressedMessage += "Các từ cần cải thiện trọng âm: " + stressedIssues.improvement.join(", ");
+  }
+  if (!stressedMessage) {
+    stressedMessage = "Trọng âm tốt.";
   }
 
   return normalMessage + "\n" + stressedMessage;
@@ -107,7 +105,7 @@ function EvaluationResults({ result, originalSentence }) {
 }
 
 export default function Home() {
-  // Danh sách câu mẫu cho Practice 1 (các dấu nhấn được đánh dấu trong câu gốc)
+  // Danh sách câu mẫu cho Practice 1 (có dấu nhấn được đánh dấu)
   const practice1List = [
     "We should ‘finish the ‘project for our ‘history ‘class.",
     "Peter is re’vising for his e’xam ‘next ‘week.",
@@ -126,9 +124,9 @@ export default function Home() {
   ];
 
   const [selectedPractice, setSelectedPractice] = useState("practice1");
-  // State chứa nội dung đã làm sạch để gửi lên API
+  // text: nội dung đã làm sạch (để gửi lên API)
   const [text, setText] = useState("");
-  // State chứa bản gốc (có dấu nhấn) để đánh giá
+  // originalSentence: bản gốc có dấu nhấn (để đánh giá)
   const [originalSentence, setOriginalSentence] = useState("");
   const [result, setResult] = useState(null);
   const [isRecording, setIsRecording] = useState(false);
@@ -139,13 +137,13 @@ export default function Home() {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
-  // Khi chọn câu mẫu, lưu cả bản gốc và phiên bản làm sạch cho textbox
+  // Khi chọn câu mẫu, lưu cả bản gốc và phiên bản làm sạch
   const handleSelectSentence = (sentence) => {
     setOriginalSentence(sentence);
     setText(cleanSentence(sentence));
   };
 
-  // Chuyển đổi giữa Practice 1 và Practice 2
+  // Chuyển đổi giữa Practice
   const handlePracticeSwitch = (practice) => {
     setSelectedPractice(practice);
     setText("");
@@ -438,6 +436,13 @@ export default function Home() {
           border: 1px solid #ddd;
           border-radius: 4px;
           background: #f9f9f9;
+          font-size: 1.4rem;
+          white-space: pre-wrap;
+        }
+        @media (max-width: 600px) {
+          .evaluation-summary {
+            font-size: 1.2rem;
+          }
         }
       `}</style>
     </div>
