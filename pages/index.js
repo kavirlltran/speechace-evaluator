@@ -5,27 +5,20 @@ function EvaluationResults({ result }) {
   const { text_score } = result;
   if (!text_score) return null;
   return (
-    <div style={{ marginTop: '2rem' }}>
+    <div className="results">
       <h2>Kết quả đánh giá</h2>
       <p>
         <strong>Văn bản:</strong> {text_score.text}
       </p>
       {text_score.word_score_list &&
         text_score.word_score_list.map((word, idx) => (
-          <div
-            key={idx}
-            style={{
-              marginBottom: '1rem',
-              padding: '0.5rem',
-              border: '1px solid #ddd',
-            }}
-          >
+          <div key={idx} className="word-box">
             <p>
               <strong>Từ:</strong> {word.word} -{' '}
               <strong>Điểm chất lượng:</strong> {word.quality_score}
             </p>
             {word.phone_score_list && (
-              <div style={{ marginLeft: '1rem' }}>
+              <div className="phone-details">
                 <p>
                   <em>Chi tiết phát âm:</em>
                 </p>
@@ -61,7 +54,7 @@ export default function Home() {
     "I have installed some apps on my phone.",
   ];
 
-  // Danh sách câu mẫu cho Practice 2 (đã thêm 2 dòng mới)
+  // Danh sách câu mẫu cho Practice 2 (bao gồm 2 câu mới)
   const practice2List = [
     "Our teacher often gives us videos to watch at home.",
     "I never read books on my tablet at night.",
@@ -81,7 +74,7 @@ export default function Home() {
   const mediaRecorderRef = useRef(null);
   const audioChunksRef = useRef([]);
 
-  // Xử lý chọn câu mẫu để điền vào ô nhập nội dung
+  // Xử lý chọn câu mẫu để điền vào textbox
   const handleSelectSentence = (sentence) => {
     setText(sentence);
   };
@@ -142,11 +135,9 @@ export default function Home() {
     }
     setLoading(true);
 
-    // Chuyển Blob thành File để gửi đi
     const audioFile = new File([audioBlob], 'recording.webm', { type: 'audio/webm' });
     const formData = new FormData();
     formData.append('text', text);
-    // Sử dụng tên trường "user_audio_file" theo yêu cầu của Speechace API
     formData.append('user_audio_file', audioFile);
 
     try {
@@ -164,28 +155,25 @@ export default function Home() {
   };
 
   return (
-    <div style={{ padding: '2rem' }}>
+    <div className="container">
       <h1>Speechace Pronunciation Evaluator</h1>
-      
-      {/* Phần chuyển đổi nội dung Practice */}
-      <div style={{ marginBottom: '1rem' }}>
-        <button onClick={() => handlePracticeSwitch("practice1")}>Practice 1</button>
-        <button onClick={() => handlePracticeSwitch("practice2")}>Practice 2</button>
+
+      <div className="practice-switch">
+        <button onClick={() => handlePracticeSwitch("practice1")} className={selectedPractice === "practice1" ? "active" : ""}>
+          Practice 1
+        </button>
+        <button onClick={() => handlePracticeSwitch("practice2")} className={selectedPractice === "practice2" ? "active" : ""}>
+          Practice 2
+        </button>
       </div>
 
-      {/* Hiển thị nội dung mẫu theo Practice được chọn */}
       {selectedPractice === "practice1" && (
-        <div style={{ border: '1px solid #ccc', padding: '1rem', marginBottom: '1rem' }}>
+        <div className="practice-list">
           {practice1List.map((sentence, idx) => (
             <div
               key={idx}
               onClick={() => handleSelectSentence(sentence)}
-              style={{
-                cursor: 'pointer',
-                marginBottom: '0.5rem',
-                backgroundColor: text === sentence ? '#eef' : 'transparent',
-                padding: '0.3rem',
-              }}
+              className={`sentence ${text === sentence ? "selected" : ""}`}
             >
               {sentence}
             </div>
@@ -193,17 +181,12 @@ export default function Home() {
         </div>
       )}
       {selectedPractice === "practice2" && (
-        <div style={{ border: '1px solid #ccc', padding: '1rem', marginBottom: '1rem' }}>
+        <div className="practice-list">
           {practice2List.map((sentence, idx) => (
             <div
               key={idx}
               onClick={() => handleSelectSentence(sentence)}
-              style={{
-                cursor: 'pointer',
-                marginBottom: '0.5rem',
-                backgroundColor: text === sentence ? '#eef' : 'transparent',
-                padding: '0.3rem',
-              }}
+              className={`sentence ${text === sentence ? "selected" : ""}`}
             >
               {sentence}
             </div>
@@ -211,57 +194,169 @@ export default function Home() {
         </div>
       )}
 
-      {/* Ô nhập nội dung – người dùng có thể chỉnh sửa sau khi chọn câu mẫu */}
-      <div style={{ marginBottom: '1rem' }}>
+      <div className="textbox-container">
         <label>Nhập nội dung bạn đọc:</label>
-        <br />
         <textarea
           value={text}
           onChange={handleTextChange}
           placeholder="Chọn nội dung từ Practice"
           required
-          rows={4}
-          style={{ width: '100%', padding: '0.5rem' }}
         />
       </div>
 
-      {/* Phần ghi âm */}
-      <div style={{ marginBottom: '1rem' }}>
+      <div className="recording-section">
         <label>Ghi âm trực tiếp:</label>
-        <br />
-        {!isRecording && (
-          <button type="button" onClick={startRecording}>
-            Bắt đầu ghi âm
-          </button>
-        )}
-        {isRecording && (
-          <button type="button" onClick={stopRecording}>
-            Dừng ghi âm
-          </button>
-        )}
+        <div className="recording-buttons">
+          {!isRecording ? (
+            <button type="button" onClick={startRecording}>
+              Bắt đầu ghi âm
+            </button>
+          ) : (
+            <button type="button" onClick={stopRecording}>
+              Dừng ghi âm
+            </button>
+          )}
+        </div>
         {audioUrl && (
-          <div style={{ marginTop: '1rem' }}>
+          <div className="audio-preview">
             <p>Xem trước âm thanh:</p>
             <audio controls src={audioUrl}></audio>
           </div>
         )}
       </div>
 
-      {/* Gửi dữ liệu đánh giá */}
-      <form onSubmit={handleSubmit}>
+      <form onSubmit={handleSubmit} className="submit-form">
         <button type="submit" disabled={loading}>
           {loading ? 'Đang đánh giá...' : 'Đánh giá phát âm'}
         </button>
       </form>
 
-      {/* Hiển thị kết quả */}
       {result && result.status === "success" && <EvaluationResults result={result} />}
       {result && result.error && (
-        <div style={{ marginTop: '2rem', color: 'red' }}>
+        <div className="error-message">
           <h2>Lỗi:</h2>
           <p>{result.error}</p>
         </div>
       )}
+
+      <style jsx>{`
+        .container {
+          max-width: 800px;
+          margin: 0 auto;
+          padding: 2rem;
+          text-align: center;
+          font-family: Arial, sans-serif;
+        }
+        h1 {
+          margin-bottom: 1.5rem;
+        }
+        .practice-switch button {
+          margin: 0 0.5rem;
+          padding: 0.5rem 1rem;
+          font-size: 1rem;
+          border: 1px solid #0070f3;
+          background: #fff;
+          color: #0070f3;
+          cursor: pointer;
+          transition: background 0.3s, color 0.3s;
+        }
+        .practice-switch button.active,
+        .practice-switch button:hover {
+          background: #0070f3;
+          color: #fff;
+        }
+        .practice-list {
+          border: 1px solid #ccc;
+          border-radius: 8px;
+          padding: 1rem;
+          margin-bottom: 1.5rem;
+          text-align: left;
+        }
+        .sentence {
+          padding: 0.5rem;
+          margin-bottom: 0.5rem;
+          border-radius: 4px;
+          cursor: pointer;
+          transition: background 0.3s;
+        }
+        .sentence:hover {
+          background: #f0f0f0;
+        }
+        .sentence.selected {
+          background: #d0eaff;
+        }
+        .textbox-container {
+          margin-bottom: 1.5rem;
+          text-align: left;
+        }
+        .textbox-container label {
+          font-weight: bold;
+        }
+        .textbox-container textarea {
+          width: 100%;
+          padding: 0.75rem;
+          border: 1px solid #ccc;
+          border-radius: 4px;
+          font-size: 1rem;
+          transition: border-color 0.3s;
+        }
+        .textbox-container textarea:focus {
+          border-color: #0070f3;
+          outline: none;
+        }
+        .recording-section {
+          margin-bottom: 1.5rem;
+          text-align: left;
+        }
+        .recording-buttons button {
+          padding: 0.5rem 1rem;
+          font-size: 1rem;
+          border: 1px solid #0070f3;
+          background: #fff;
+          color: #0070f3;
+          cursor: pointer;
+          transition: background 0.3s, color 0.3s;
+          margin-right: 1rem;
+        }
+        .recording-buttons button:hover {
+          background: #0070f3;
+          color: #fff;
+        }
+        .audio-preview {
+          margin-top: 1rem;
+        }
+        .submit-form button {
+          padding: 0.75rem 1.5rem;
+          font-size: 1rem;
+          background: #0070f3;
+          color: #fff;
+          border: none;
+          border-radius: 4px;
+          cursor: pointer;
+          transition: background 0.3s;
+        }
+        .submit-form button:hover {
+          background: #005bb5;
+        }
+        .error-message {
+          color: red;
+          margin-top: 1.5rem;
+        }
+        .results {
+          text-align: left;
+          margin-top: 2rem;
+        }
+        .word-box {
+          border: 1px solid #ddd;
+          padding: 0.5rem;
+          border-radius: 4px;
+          margin-bottom: 1rem;
+        }
+        .phone-details ul {
+          list-style: none;
+          padding-left: 1rem;
+        }
+      `}</style>
     </div>
   );
 }
